@@ -43,34 +43,22 @@ func NewClient(baseURL string, apiToken string, opts ...ConfigOption) *Client {
 	}
 }
 
-func (c *Client) addAuthHeaders(req *http.Request) {
-	req.Header.Set("Authorization", c.apiToken)
-}
-
-func (c *Client) makeAuthenticatedRequest(method, endpoint string, body io.Reader) (*http.Response, error) {
-	req, err := http.NewRequest(method, endpoint, body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-	c.addAuthHeaders(req)
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to make %s request: %w", method, err)
-	}
-	return resp, nil
-}
-
 func (c *Client) Version() (string, error) {
-	// /api2/json/version
 	endpoint, err := url.JoinPath(c.baseURL, "/api2/json/version")
 	if err != nil {
 		return "", fmt.Errorf("failed to construct URL: %w", err)
 	}
+	headers := http.Header{}
+	headers.Set("Authorization", c.apiToken)
 
-	var resp *http.Response
-	resp, err = c.makeAuthenticatedRequest(http.MethodGet, endpoint, nil)
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to make GET request: %w", err)
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header = headers
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", err
 	}
 	defer resp.Body.Close()
 
