@@ -30,8 +30,10 @@ func NewClient(baseURL string, apiToken string, opts ...ConfigOption) *Client {
 	}
 	var httpClient http.Client
 	if config.insecureSkipTLS {
-		httpClient.Transport = &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		httpClient.Transport = &http.Transport{ //nolint:exhaustruct
+			TLSClientConfig: &tls.Config{ //nolint:exhaustruct
+				InsecureSkipVerify: true,
+			},
 		}
 	}
 	return &Client{
