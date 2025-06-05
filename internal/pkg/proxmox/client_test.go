@@ -3,6 +3,7 @@
 package proxmox_test
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -20,8 +21,9 @@ func TestClient_Version(t *testing.T) {
 		t.Skip("PROXMOX_API_TOKEN environment variable not set, skipping integration test")
 	}
 	client := proxmox.NewClient(baseURL, apiToken, proxmox.WithInsecure())
+	ctx := context.Background()
 
-	version, err := client.Version()
+	version, err := client.Version(ctx)
 
 	require.NoError(t, err, "Version() should not return an error")
 	require.NotEmpty(t, version, "Version() should not return empty string")

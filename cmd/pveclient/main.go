@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -14,6 +16,8 @@ type Config struct {
 	apiToken   string
 }
 
+var ErrEnvNotSet = errors.New("environment variable is not set")
+
 func LoadConfig() (*Config, error) {
 	err := godotenv.Load()
 	if err != nil {
@@ -25,11 +29,12 @@ func LoadConfig() (*Config, error) {
 
 	proxmoxURL := os.Getenv("PROXMOX_URL")
 	if proxmoxURL == "" {
-		return nil, fmt.Errorf("PROXMOX_URL is not set")
+		return nil, fmt.Errorf("PROXMOX_URL: %w", ErrEnvNotSet)
 	}
+
 	apiToken := os.Getenv("PROXMOX_API_TOKEN")
 	if apiToken == "" {
-		return nil, fmt.Errorf("PROXMOX_API_TOKEN is not set")
+		return nil, fmt.Errorf("PROXMOX_API_TOKEN: %w", ErrEnvNotSet)
 	}
 
 	return &Config{
@@ -43,16 +48,20 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
+
 	client := proxmox.NewClient(config.proxmoxURL, config.apiToken, proxmox.WithInsecure())
 	testConnection(client)
 }
 
 func testConnection(client *proxmox.Client) {
-	version, err := client.Version()
+	ctx := context.Background()
+
+	version, err := client.Version(ctx)
 	if err != nil {
 		log.Printf("Failed to get Proxmox version: %v", err)
+
 		return
 	}
 
-	fmt.Printf("Successfully connected to Proxmox VE version: %s\n", version)
+	log.Printf("Successfully connected to Proxmox VE version: %s\n", version)
 }
