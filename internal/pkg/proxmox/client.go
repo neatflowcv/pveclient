@@ -10,10 +10,9 @@ import (
 )
 
 type Client struct {
-	baseURL         string
-	apiToken        string
-	httpClient      *http.Client
-	insecureSkipTLS bool
+	baseURL    string
+	apiToken   string
+	httpClient *http.Client
 }
 
 type VersionResponse struct {
@@ -24,63 +23,28 @@ type VersionResponse struct {
 	} `json:"data"`
 }
 
-func NewClient(baseURL string) *Client {
-	return &Client{
-		baseURL:         baseURL,
-		httpClient:      &http.Client{},
-		insecureSkipTLS: false,
+func NewClient(baseURL string, apiToken string, opts ...ConfigOption) *Client {
+	var config Config
+	for _, opt := range opts {
+		opt(&config)
 	}
-}
-
-func NewInsecureClient(baseURL string) *Client {
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	return &Client{
-		baseURL:         baseURL,
-		httpClient:      &http.Client{Transport: tr},
-		insecureSkipTLS: true,
-	}
-}
-
-// NewClientWithAPIToken creates a new client with API token authentication
-func NewClientWithAPIToken(baseURL, apiToken string) *Client {
-	client := NewClient(baseURL)
-	client.apiToken = apiToken
-	return client
-}
-
-// NewInsecureClientWithAPIToken creates a new insecure client with API token authentication
-func NewInsecureClientWithAPIToken(baseURL, apiToken string) *Client {
-	client := NewInsecureClient(baseURL)
-	client.apiToken = apiToken
-	return client
-}
-
-func (c *Client) SetInsecureSkipTLS(skip bool) {
-	c.insecureSkipTLS = skip
-	if skip {
-		tr := &http.Transport{
+	var httpClient http.Client
+	if config.insecureSkipTLS {
+		httpClient.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
-		c.httpClient.Transport = tr
-	} else {
-		c.httpClient.Transport = nil // Use default transport
+	}
+	return &Client{
+		baseURL:    baseURL,
+		apiToken:   apiToken,
+		httpClient: &httpClient,
 	}
 }
 
-// SetAPIToken sets the API token for authentication
-func (c *Client) SetAPIToken(apiToken string) {
-	c.apiToken = apiToken
-}
-
-// addAuthHeaders adds appropriate authentication headers to the request
 func (c *Client) addAuthHeaders(req *http.Request) {
-	// API Token authentication
 	req.Header.Set("Authorization", c.apiToken)
 }
 
-// makeAuthenticatedRequest creates and executes an authenticated request
 func (c *Client) makeAuthenticatedRequest(method, endpoint string, body io.Reader) (*http.Response, error) {
 	req, err := http.NewRequest(method, endpoint, body)
 	if err != nil {

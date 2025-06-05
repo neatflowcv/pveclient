@@ -43,12 +43,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
-	client := proxmox.NewInsecureClientWithAPIToken(config.proxmoxURL, config.apiToken)
+	client := proxmox.NewClient(config.proxmoxURL, config.apiToken, proxmox.WithInsecure())
 	testConnection(client)
 }
 
 func testConnection(client *proxmox.Client) {
-	// Test the connection by getting the version
 	version, err := client.Version()
 	if err != nil {
 		log.Printf("Failed to get Proxmox version: %v", err)
