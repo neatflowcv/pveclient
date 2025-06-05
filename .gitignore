@@ -1,4 +1,4 @@
-pveclient
-.vscode/*
-.env
-vendor/*
+/pveclient
+/.vscode/
+/.env
+/vendor/

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -9,8 +11,14 @@ import (
 	"github.com/neatflowcv/pveclient/internal/pkg/proxmox"
 )
 
-func main() {
-	// Load environment variables from .env file
+type Config struct {
+	proxmoxURL string
+	apiToken   string
+}
+
+var ErrEnvNotSet = errors.New("environment variable is not set")
+
+func LoadConfig() (*Config, error) {
 	err := godotenv.Load()
 	if err != nil {
 		log.Printf("Warning: Could not load .env file: %v", err)
@@ -19,63 +27,41 @@ func main() {
 		log.Println("Loaded environment variables from .env file")
 	}
 
-	// Get Proxmox server URL from environment variable or use default
 	proxmoxURL := os.Getenv("PROXMOX_URL")
 	if proxmoxURL == "" {
-		proxmoxURL = "https://your-proxmox-server:8006"
+		return nil, fmt.Errorf("PROXMOX_URL: %w", ErrEnvNotSet)
 	}
 
-	// Method 1: Using API Token (Recommended for scripts)
 	apiToken := os.Getenv("PROXMOX_API_TOKEN")
-	if apiToken != "" {
-		fmt.Println("Using API Token authentication...")
-		client := proxmox.NewInsecureClientWithAPIToken(proxmoxURL, apiToken)
-		testConnection(client)
-		return
+	if apiToken == "" {
+		return nil, fmt.Errorf("PROXMOX_API_TOKEN: %w", ErrEnvNotSet)
 	}
 
-	// Method 2: Using Username/Password
-	username := os.Getenv("PROXMOX_USERNAME")
-	password := os.Getenv("PROXMOX_PASSWORD")
-	if username != "" && password != "" {
-		fmt.Println("Using username/password authentication...")
-		client := proxmox.NewInsecureClientWithAuth(proxmoxURL, username, password)
-		testConnection(client)
-		return
+	return &Config{
+		proxmoxURL: proxmoxURL,
+		apiToken:   apiToken,
+	}, nil
+}
+
+func main() {
+	config, err := LoadConfig()
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	// Method 3: Creating client and setting auth later
-	fmt.Println("No authentication credentials found in environment variables.")
-	fmt.Println("Please set one of the following:")
-	fmt.Println("  - PROXMOX_API_TOKEN: API token in format 'user@realm!tokenid=secret'")
-	fmt.Println("  - PROXMOX_USERNAME and PROXMOX_PASSWORD: Username and password")
-	fmt.Println()
-	fmt.Println("You can either:")
-	fmt.Println("1. Create a .env file with your configuration:")
-	fmt.Println("   PROXMOX_URL=https://your-proxmox-server:8006")
-	fmt.Println("   PROXMOX_API_TOKEN=root@pam!mytoken=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
-	fmt.Println()
-	fmt.Println("2. Or set environment variables directly:")
-	fmt.Println("   export PROXMOX_URL='https://your-proxmox-server:8006'")
-	fmt.Println("   export PROXMOX_API_TOKEN='root@pam!mytoken=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'")
-	fmt.Println()
-	fmt.Println("For username/password authentication:")
-	fmt.Println("   PROXMOX_USERNAME=root@pam")
-	fmt.Println("   PROXMOX_PASSWORD=your-password")
-
-	// Try without authentication (will likely fail with 401)
-	fmt.Println("\nTrying without authentication (this will likely fail)...")
-	client := proxmox.NewInsecureClient(proxmoxURL)
+	client := proxmox.NewClient(config.proxmoxURL, config.apiToken, proxmox.WithInsecure())
 	testConnection(client)
 }
 
 func testConnection(client *proxmox.Client) {
-	// Test the connection by getting the version
-	version, err := client.Version()
+	ctx := context.Background()
+
+	version, err := client.Version(ctx)
 	if err != nil {
 		log.Printf("Failed to get Proxmox version: %v", err)
+
 		return
 	}
 
-	fmt.Printf("Successfully connected to Proxmox VE version: %s\n", version)
+	log.Printf("Successfully connected to Proxmox VE version: %s\n", version)
 }
