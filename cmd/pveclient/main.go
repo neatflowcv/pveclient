@@ -9,8 +9,12 @@ import (
 	"github.com/neatflowcv/pveclient/internal/pkg/proxmox"
 )
 
-func main() {
-	// Load environment variables from .env file
+type Config struct {
+	proxmoxURL string
+	apiToken   string
+}
+
+func LoadConfig() (*Config, error) {
 	err := godotenv.Load()
 	if err != nil {
 		log.Printf("Warning: Could not load .env file: %v", err)
@@ -19,17 +23,27 @@ func main() {
 		log.Println("Loaded environment variables from .env file")
 	}
 
-	// Get Proxmox server URL from environment variable or use default
 	proxmoxURL := os.Getenv("PROXMOX_URL")
 	if proxmoxURL == "" {
-		log.Fatal("PROXMOX_URL is not set")
+		return nil, fmt.Errorf("PROXMOX_URL is not set")
 	}
 	apiToken := os.Getenv("PROXMOX_API_TOKEN")
 	if apiToken == "" {
-		log.Fatal("PROXMOX_API_TOKEN is not set")
+		return nil, fmt.Errorf("PROXMOX_API_TOKEN is not set")
 	}
 
-	client := proxmox.NewInsecureClientWithAPIToken(proxmoxURL, apiToken)
+	return &Config{
+		proxmoxURL: proxmoxURL,
+		apiToken:   apiToken,
+	}, nil
+}
+
+func main() {
+	config, err := LoadConfig()
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+	client := proxmox.NewInsecureClientWithAPIToken(config.proxmoxURL, config.apiToken)
 	testConnection(client)
 }
 
