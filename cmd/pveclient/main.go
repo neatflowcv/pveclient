@@ -5,10 +5,20 @@ import (
 	"log"
 	"os"
 
+	"github.com/joho/godotenv"
 	"github.com/neatflowcv/pveclient/internal/pkg/proxmox"
 )
 
 func main() {
+	// Load environment variables from .env file
+	err := godotenv.Load()
+	if err != nil {
+		log.Printf("Warning: Could not load .env file: %v", err)
+		log.Println("Proceeding with system environment variables...")
+	} else {
+		log.Println("Loaded environment variables from .env file")
+	}
+
 	// Get Proxmox server URL from environment variable or use default
 	proxmoxURL := os.Getenv("PROXMOX_URL")
 	if proxmoxURL == "" {
@@ -40,14 +50,18 @@ func main() {
 	fmt.Println("  - PROXMOX_API_TOKEN: API token in format 'user@realm!tokenid=secret'")
 	fmt.Println("  - PROXMOX_USERNAME and PROXMOX_PASSWORD: Username and password")
 	fmt.Println()
-	fmt.Println("Example API token usage:")
-	fmt.Println("  export PROXMOX_URL='https://your-proxmox-server:8006'")
-	fmt.Println("  export PROXMOX_API_TOKEN='root@pam!mytoken=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'")
+	fmt.Println("You can either:")
+	fmt.Println("1. Create a .env file with your configuration:")
+	fmt.Println("   PROXMOX_URL=https://your-proxmox-server:8006")
+	fmt.Println("   PROXMOX_API_TOKEN=root@pam!mytoken=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
 	fmt.Println()
-	fmt.Println("Example username/password usage:")
-	fmt.Println("  export PROXMOX_URL='https://your-proxmox-server:8006'")
-	fmt.Println("  export PROXMOX_USERNAME='root@pam'")
-	fmt.Println("  export PROXMOX_PASSWORD='your-password'")
+	fmt.Println("2. Or set environment variables directly:")
+	fmt.Println("   export PROXMOX_URL='https://your-proxmox-server:8006'")
+	fmt.Println("   export PROXMOX_API_TOKEN='root@pam!mytoken=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'")
+	fmt.Println()
+	fmt.Println("For username/password authentication:")
+	fmt.Println("   PROXMOX_USERNAME=root@pam")
+	fmt.Println("   PROXMOX_PASSWORD=your-password")
 
 	// Try without authentication (will likely fail with 401)
 	fmt.Println("\nTrying without authentication (this will likely fail)...")

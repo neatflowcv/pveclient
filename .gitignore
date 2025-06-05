@@ -1,2 +1,4 @@
 pveclient
 .vscode/*
+.env
+vendor/*
