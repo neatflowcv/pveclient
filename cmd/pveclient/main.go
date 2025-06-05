@@ -22,50 +22,14 @@ func main() {
 	// Get Proxmox server URL from environment variable or use default
 	proxmoxURL := os.Getenv("PROXMOX_URL")
 	if proxmoxURL == "" {
-		proxmoxURL = "https://your-proxmox-server:8006"
+		log.Fatal("PROXMOX_URL is not set")
 	}
-
-	// Method 1: Using API Token (Recommended for scripts)
 	apiToken := os.Getenv("PROXMOX_API_TOKEN")
-	if apiToken != "" {
-		fmt.Println("Using API Token authentication...")
-		client := proxmox.NewInsecureClientWithAPIToken(proxmoxURL, apiToken)
-		testConnection(client)
-		return
+	if apiToken == "" {
+		log.Fatal("PROXMOX_API_TOKEN is not set")
 	}
 
-	// Method 2: Using Username/Password
-	username := os.Getenv("PROXMOX_USERNAME")
-	password := os.Getenv("PROXMOX_PASSWORD")
-	if username != "" && password != "" {
-		fmt.Println("Using username/password authentication...")
-		client := proxmox.NewInsecureClientWithAuth(proxmoxURL, username, password)
-		testConnection(client)
-		return
-	}
-
-	// Method 3: Creating client and setting auth later
-	fmt.Println("No authentication credentials found in environment variables.")
-	fmt.Println("Please set one of the following:")
-	fmt.Println("  - PROXMOX_API_TOKEN: API token in format 'user@realm!tokenid=secret'")
-	fmt.Println("  - PROXMOX_USERNAME and PROXMOX_PASSWORD: Username and password")
-	fmt.Println()
-	fmt.Println("You can either:")
-	fmt.Println("1. Create a .env file with your configuration:")
-	fmt.Println("   PROXMOX_URL=https://your-proxmox-server:8006")
-	fmt.Println("   PROXMOX_API_TOKEN=root@pam!mytoken=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
-	fmt.Println()
-	fmt.Println("2. Or set environment variables directly:")
-	fmt.Println("   export PROXMOX_URL='https://your-proxmox-server:8006'")
-	fmt.Println("   export PROXMOX_API_TOKEN='root@pam!mytoken=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'")
-	fmt.Println()
-	fmt.Println("For username/password authentication:")
-	fmt.Println("   PROXMOX_USERNAME=root@pam")
-	fmt.Println("   PROXMOX_PASSWORD=your-password")
-
-	// Try without authentication (will likely fail with 401)
-	fmt.Println("\nTrying without authentication (this will likely fail)...")
-	client := proxmox.NewInsecureClient(proxmoxURL)
+	client := proxmox.NewInsecureClientWithAPIToken(proxmoxURL, apiToken)
 	testConnection(client)
 }
 
