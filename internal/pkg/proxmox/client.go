@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strconv"
 )
 
 type Client struct {
@@ -74,43 +75,13 @@ func (c *Client) Version(ctx context.Context) (string, error) {
 	}
 
 	var versionResp VersionResponse
-	if err := json.Unmarshal(content, &versionResp); err != nil {
+
+	err = json.Unmarshal(content, &versionResp)
+	if err != nil {
 		return "", fmt.Errorf("failed to parse JSON response: %w", err)
 	}
 
 	return versionResp.Data.Version, nil
-}
-
-func (c *Client) call(req *http.Request) (int, []byte, error) {
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return 0, nil, fmt.Errorf("failed to make request: %w", err)
-	}
-
-	defer func() {
-		err := resp.Body.Close()
-		if err != nil {
-			log.Printf("failed to close response body: %v", err)
-		}
-	}()
-
-	content, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return 0, nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	return resp.StatusCode, content, nil
-}
-
-func newGetRequest(ctx context.Context, endpoint string, headers http.Header) (*http.Request, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header = headers
-
-	return req, nil
 }
 
 type ListNodesResponse struct {
@@ -162,4 +133,154 @@ func (c *Client) ListNodes(ctx context.Context) (*ListNodesResponse, error) {
 	}
 
 	return &ret, nil
+}
+
+type ListDisksResponse struct {
+	Data []struct {
+		Size         int64       `json:"size"`
+		OsdidList    interface{} `json:"osdid-list"`
+		Osdid        IntValue    `json:"osdid"`
+		Used         string      `json:"used,omitempty"`
+		Wwn          string      `json:"wwn"`
+		Health       string      `json:"health"`
+		Rpm          IntValue    `json:"rpm"`
+		Gpt          int         `json:"gpt"`
+		Type         string      `json:"type"`
+		ByIDLink     string      `json:"by_id_link"`
+		Serial       string      `json:"serial"`
+		Devpath      string      `json:"devpath"`
+		Wearout      Wearout     `json:"wearout"`
+		Model        string      `json:"model"`
+		Vendor       string      `json:"vendor"`
+		Db           int         `json:"db,omitempty"`
+		Bluestore    int         `json:"bluestore,omitempty"`
+		Osdencrypted int         `json:"osdencrypted,omitempty"`
+	} `json:"data"`
+}
+
+func (c *Client) ListDisks(ctx context.Context, node string) (*ListDisksResponse, error) {
+	endpoint, err := url.JoinPath(c.baseURL, "/api2/json/nodes", node, "disks/list")
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct URL: %w", err)
+	}
+
+	headers := http.Header{}
+	headers.Set("Authorization", c.apiToken)
+
+	req, err := newGetRequest(ctx, endpoint, headers)
+	if err != nil {
+		return nil, err
+	}
+
+	statusCode, content, err := c.call(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: %d", ErrInvalidStatusCode, statusCode)
+	}
+
+	var ret ListDisksResponse
+
+	err = json.Unmarshal(content, &ret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse JSON response: %w", err)
+	}
+
+	return &ret, nil
+}
+
+func (c *Client) call(req *http.Request) (int, []byte, error) {
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to make request: %w", err)
+	}
+
+	defer func() {
+		err := resp.Body.Close()
+		if err != nil {
+			log.Printf("failed to close response body: %v", err)
+		}
+	}()
+
+	content, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	return resp.StatusCode, content, nil
+}
+
+func newGetRequest(ctx context.Context, endpoint string, headers http.Header) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header = headers
+
+	return req, nil
+}
+
+type Wearout struct {
+	IsAvailable bool
+	Value       int
+}
+
+func (w *Wearout) UnmarshalJSON(data []byte) error {
+	if string(data) == "\"N/A\"" {
+		w.IsAvailable = false
+		w.Value = 0
+
+		return nil
+	}
+
+	value, err := strconv.ParseInt(string(data), 10, 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse wearout: %w", err)
+	}
+
+	w.IsAvailable = true
+	w.Value = int(value)
+
+	return nil
+}
+
+type IntValue struct {
+	Value int
+}
+
+func (i *IntValue) UnmarshalJSON(data []byte) error {
+	// -1인 경우 처리
+	if string(data) == "-1" {
+		i.Value = -1
+
+		return nil
+	}
+
+	// 따옴표로 둘러싸인 문자열인 경우 처리
+	if len(data) >= 2 && data[0] == '"' && data[len(data)-1] == '"' {
+		// 따옴표 제거
+		str := string(data[1 : len(data)-1])
+
+		value, err := strconv.ParseInt(str, 10, 64)
+		if err != nil {
+			return fmt.Errorf("failed to parse osdid from quoted string: %w", err)
+		}
+
+		i.Value = int(value)
+
+		return nil
+	}
+
+	// 일반 숫자인 경우 처리
+	value, err := strconv.ParseInt(string(data), 10, 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse osdid: %w", err)
+	}
+
+	i.Value = int(value)
+
+	return nil
 }

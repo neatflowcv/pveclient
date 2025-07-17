@@ -3,7 +3,6 @@
 package proxmox_test
 
 import (
-	"context"
 	"os"
 	"testing"
 
@@ -52,3 +51,21 @@ func TestClient_ListNodes(t *testing.T) {
 	}
 }
 
+func TestClient_ListDisks(t *testing.T) {
+	baseURL := os.Getenv("PROXMOX_URL")
+	if baseURL == "" {
+		t.Skip("PROXMOX_URL environment variable not set, skipping integration test")
+	}
+	apiToken := os.Getenv("PROXMOX_API_TOKEN")
+	if apiToken == "" {
+		t.Skip("PROXMOX_API_TOKEN environment variable not set, skipping integration test")
+	}
+	client := proxmox.NewClient(baseURL, apiToken, proxmox.WithInsecure())
+	ctx := t.Context()
+	nodes, _ := client.ListNodes(ctx)
+
+	disks, err := client.ListDisks(ctx, nodes.Data[0].Node)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, disks)
+}
