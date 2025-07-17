@@ -4,7 +4,7 @@ build:
 
 .PHONY: lint
 lint:
-	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.6
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.2.2
 	golangci-lint run
 
 .PHONY: test
