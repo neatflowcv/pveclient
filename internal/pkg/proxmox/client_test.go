@@ -21,11 +21,34 @@ func TestClient_Version(t *testing.T) {
 		t.Skip("PROXMOX_API_TOKEN environment variable not set, skipping integration test")
 	}
 	client := proxmox.NewClient(baseURL, apiToken, proxmox.WithInsecure())
-	ctx := context.Background()
+	ctx := t.Context()
 
 	version, err := client.Version(ctx)
 
-	require.NoError(t, err, "Version() should not return an error")
-	require.NotEmpty(t, version, "Version() should not return empty string")
-	require.Contains(t, version, ".", "Version() should contain a dot in the format")
+	require.NoError(t, err)
+	require.NotEmpty(t, version)
+	require.Contains(t, version, ".")
 }
+
+func TestClient_ListNodes(t *testing.T) {
+	baseURL := os.Getenv("PROXMOX_URL")
+	if baseURL == "" {
+		t.Skip("PROXMOX_URL environment variable not set, skipping integration test")
+	}
+	apiToken := os.Getenv("PROXMOX_API_TOKEN")
+	if apiToken == "" {
+		t.Skip("PROXMOX_API_TOKEN environment variable not set, skipping integration test")
+	}
+	client := proxmox.NewClient(baseURL, apiToken, proxmox.WithInsecure())
+	ctx := t.Context()
+
+	nodes, err := client.ListNodes(ctx)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, nodes)
+	for _, node := range nodes.Data {
+		require.Equal(t, "node", node.Type) // 고정값
+		require.NotEmpty(t, node.Node)
+	}
+}
+

@@ -112,3 +112,54 @@ func newGetRequest(ctx context.Context, endpoint string, headers http.Header) (*
 
 	return req, nil
 }
+
+type ListNodesResponse struct {
+	Data []struct {
+		Status         string  `json:"status"`
+		Maxcpu         int     `json:"maxcpu"`
+		Mem            int64   `json:"mem"`
+		CPU            float64 `json:"cpu"`
+		Level          string  `json:"level"`
+		Maxdisk        int64   `json:"maxdisk"`
+		ID             string  `json:"id"`
+		Maxmem         int64   `json:"maxmem"`
+		Disk           int64   `json:"disk"`
+		Type           string  `json:"type"`
+		SslFingerprint string  `json:"ssl_fingerprint"`
+		Node           string  `json:"node"`
+		Uptime         int     `json:"uptime"`
+	} `json:"data"`
+}
+
+func (c *Client) ListNodes(ctx context.Context) (*ListNodesResponse, error) {
+	endpoint, err := url.JoinPath(c.baseURL, "/api2/json/nodes")
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct URL: %w", err)
+	}
+
+	headers := http.Header{}
+	headers.Set("Authorization", c.apiToken)
+
+	req, err := newGetRequest(ctx, endpoint, headers)
+	if err != nil {
+		return nil, err
+	}
+
+	statusCode, content, err := c.call(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: %d", ErrInvalidStatusCode, statusCode)
+	}
+
+	var ret ListNodesResponse
+
+	err = json.Unmarshal(content, &ret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse JSON response: %w", err)
+	}
+
+	return &ret, nil
+}
