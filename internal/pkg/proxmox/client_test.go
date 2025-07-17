@@ -11,14 +11,18 @@ import (
 )
 
 func TestClient_Version(t *testing.T) {
+	t.Parallel()
+
 	baseURL := os.Getenv("PROXMOX_URL")
 	if baseURL == "" {
 		t.Skip("PROXMOX_URL environment variable not set, skipping integration test")
 	}
+
 	apiToken := os.Getenv("PROXMOX_API_TOKEN")
 	if apiToken == "" {
 		t.Skip("PROXMOX_API_TOKEN environment variable not set, skipping integration test")
 	}
+
 	client := proxmox.NewClient(baseURL, apiToken, proxmox.WithInsecure())
 	ctx := t.Context()
 
@@ -30,14 +34,18 @@ func TestClient_Version(t *testing.T) {
 }
 
 func TestClient_ListNodes(t *testing.T) {
+	t.Parallel()
+
 	baseURL := os.Getenv("PROXMOX_URL")
 	if baseURL == "" {
 		t.Skip("PROXMOX_URL environment variable not set, skipping integration test")
 	}
+
 	apiToken := os.Getenv("PROXMOX_API_TOKEN")
 	if apiToken == "" {
 		t.Skip("PROXMOX_API_TOKEN environment variable not set, skipping integration test")
 	}
+
 	client := proxmox.NewClient(baseURL, apiToken, proxmox.WithInsecure())
 	ctx := t.Context()
 
@@ -45,6 +53,7 @@ func TestClient_ListNodes(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotEmpty(t, nodes)
+
 	for _, node := range nodes.Data {
 		require.Equal(t, "node", node.Type) // 고정값
 		require.NotEmpty(t, node.Node)
@@ -52,14 +61,18 @@ func TestClient_ListNodes(t *testing.T) {
 }
 
 func TestClient_ListDisks(t *testing.T) {
+	t.Parallel()
+
 	baseURL := os.Getenv("PROXMOX_URL")
 	if baseURL == "" {
 		t.Skip("PROXMOX_URL environment variable not set, skipping integration test")
 	}
+
 	apiToken := os.Getenv("PROXMOX_API_TOKEN")
 	if apiToken == "" {
 		t.Skip("PROXMOX_API_TOKEN environment variable not set, skipping integration test")
 	}
+
 	client := proxmox.NewClient(baseURL, apiToken, proxmox.WithInsecure())
 	ctx := t.Context()
 	nodes, _ := client.ListNodes(ctx)
