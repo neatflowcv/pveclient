@@ -135,6 +135,13 @@ func (c *Client) ListNodes(ctx context.Context) (*ListNodesResponse, error) {
 	return &ret, nil
 }
 
+type DiskType string
+
+const (
+	DiskTypeHDD DiskType = "hdd"
+	DiskTypeSSD DiskType = "ssd"
+)
+
 type ListDisksResponse struct {
 	Data []struct {
 		Size         int64       `json:"size"`
@@ -145,7 +152,7 @@ type ListDisksResponse struct {
 		Health       string      `json:"health"`
 		Rpm          IntValue    `json:"rpm"`
 		Gpt          int         `json:"gpt"`
-		Type         string      `json:"type"`
+		Type         DiskType    `json:"type"`
 		ByIDLink     string      `json:"by_id_link"`
 		Serial       string      `json:"serial"`
 		Devpath      string      `json:"devpath"`
