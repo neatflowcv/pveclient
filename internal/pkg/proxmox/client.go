@@ -2,21 +2,17 @@ package proxmox
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"log"
-	"net/http"
 	"net/url"
 	"strconv"
 )
 
 type Client struct {
-	baseURL    string
-	apiToken   string
-	httpClient *http.Client
+	baseURL   string
+	apiToken  string
+	requester *Requester
 }
 
 type VersionResponse struct {
@@ -33,19 +29,10 @@ func NewClient(baseURL string, apiToken string, opts ...ConfigOption) *Client {
 		opt(&config)
 	}
 
-	var httpClient http.Client
-	if config.insecureSkipTLS {
-		httpClient.Transport = &http.Transport{ //nolint:exhaustruct
-			TLSClientConfig: &tls.Config{ //nolint:exhaustruct
-				InsecureSkipVerify: true, //nolint:gosec
-			},
-		}
-	}
-
 	return &Client{
-		baseURL:    baseURL,
-		apiToken:   apiToken,
-		httpClient: &httpClient,
+		baseURL:   baseURL,
+		apiToken:  apiToken,
+		requester: NewRequester(config.insecureSkipTLS),
 	}
 }
 
@@ -57,20 +44,16 @@ func (c *Client) Version(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("failed to construct URL: %w", err)
 	}
 
-	headers := http.Header{}
-	headers.Set("Authorization", c.apiToken)
+	req := NewGetRequest(ctx, endpoint, map[string][]string{
+		"Authorization": {c.apiToken},
+	})
 
-	req, err := newGetRequest(ctx, endpoint, headers)
+	statusCode, content, err := c.requester.Call(req)
 	if err != nil {
 		return "", err
 	}
 
-	statusCode, content, err := c.call(req)
-	if err != nil {
-		return "", err
-	}
-
-	if statusCode != http.StatusOK {
+	if statusCode != StatusCodeOK {
 		return "", fmt.Errorf("%w: %d", ErrInvalidStatusCode, statusCode)
 	}
 
@@ -108,20 +91,16 @@ func (c *Client) ListNodes(ctx context.Context) (*ListNodesResponse, error) {
 		return nil, fmt.Errorf("failed to construct URL: %w", err)
 	}
 
-	headers := http.Header{}
-	headers.Set("Authorization", c.apiToken)
+	req := NewGetRequest(ctx, endpoint, map[string][]string{
+		"Authorization": {c.apiToken},
+	})
 
-	req, err := newGetRequest(ctx, endpoint, headers)
+	statusCode, content, err := c.requester.Call(req)
 	if err != nil {
 		return nil, err
 	}
 
-	statusCode, content, err := c.call(req)
-	if err != nil {
-		return nil, err
-	}
-
-	if statusCode != http.StatusOK {
+	if statusCode != StatusCodeOK {
 		return nil, fmt.Errorf("%w: %d", ErrInvalidStatusCode, statusCode)
 	}
 
@@ -171,20 +150,16 @@ func (c *Client) ListDisks(ctx context.Context, node string) (*ListDisksResponse
 		return nil, fmt.Errorf("failed to construct URL: %w", err)
 	}
 
-	headers := http.Header{}
-	headers.Set("Authorization", c.apiToken)
+	req := NewGetRequest(ctx, endpoint, map[string][]string{
+		"Authorization": {c.apiToken},
+	})
 
-	req, err := newGetRequest(ctx, endpoint, headers)
+	statusCode, content, err := c.requester.Call(req)
 	if err != nil {
 		return nil, err
 	}
 
-	statusCode, content, err := c.call(req)
-	if err != nil {
-		return nil, err
-	}
-
-	if statusCode != http.StatusOK {
+	if statusCode != StatusCodeOK {
 		return nil, fmt.Errorf("%w: %d", ErrInvalidStatusCode, statusCode)
 	}
 
@@ -196,38 +171,6 @@ func (c *Client) ListDisks(ctx context.Context, node string) (*ListDisksResponse
 	}
 
 	return &ret, nil
-}
-
-func (c *Client) call(req *http.Request) (int, []byte, error) {
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return 0, nil, fmt.Errorf("failed to make request: %w", err)
-	}
-
-	defer func() {
-		err := resp.Body.Close()
-		if err != nil {
-			log.Printf("failed to close response body: %v", err)
-		}
-	}()
-
-	content, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return 0, nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	return resp.StatusCode, content, nil
-}
-
-func newGetRequest(ctx context.Context, endpoint string, headers http.Header) (*http.Request, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header = headers
-
-	return req, nil
 }
 
 type Wearout struct {
