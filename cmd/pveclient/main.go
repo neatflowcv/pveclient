@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	"github.com/neatflowcv/pveclient/internal/pkg/config"
@@ -9,13 +10,30 @@ import (
 )
 
 func main() {
-	config, err := config.LoadConfig()
-	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+	config := config.LoadConfig()
+	client := newClient(config)
+	testConnection(client)
+}
+
+func newClient(config *config.Config) *proxmox.Client {
+	var opts []proxmox.ConfigOption
+
+	if config.Insecure {
+		opts = append(opts, proxmox.WithInsecure())
 	}
 
-	client := proxmox.NewClient(config.ProxmoxURL, config.APIToken, proxmox.WithInsecure())
-	testConnection(client)
+	switch config.AuthMethod {
+	case "token":
+		secret := fmt.Sprintf("PVEAPIToken=%s@%s!%s=%s", config.Username, config.Realm, config.TokenID, config.TokenSecret)
+
+		return proxmox.NewClient(config.ProxmoxURL, secret, opts...)
+
+	case "password":
+		panic("unimplemented")
+
+	default:
+		panic("invalid auth method: " + config.AuthMethod)
+	}
 }
 
 func testConnection(client *proxmox.Client) {

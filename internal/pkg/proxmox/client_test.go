@@ -3,6 +3,7 @@
 package proxmox_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/neatflowcv/pveclient/internal/pkg/config"
@@ -53,10 +54,24 @@ func TestClient_ListDisks(t *testing.T) {
 func newClient(t *testing.T) *proxmox.Client {
 	t.Helper()
 
-	config, err := config.LoadConfig()
-	require.NoError(t, err)
+	config := config.LoadConfig()
 
-	client := proxmox.NewClient(config.ProxmoxURL, config.APIToken, proxmox.WithInsecure())
+	var opts []proxmox.ConfigOption
 
-	return client
+	if config.Insecure {
+		opts = append(opts, proxmox.WithInsecure())
+	}
+
+	switch config.AuthMethod {
+	case "token":
+		secret := fmt.Sprintf("PVEAPIToken=%s@%s!%s=%s", config.Username, config.Realm, config.TokenID, config.TokenSecret)
+
+		return proxmox.NewClient(config.ProxmoxURL, secret, opts...)
+
+	case "password":
+		panic("unimplemented")
+
+	default:
+		panic("invalid auth method: " + config.AuthMethod)
+	}
 }

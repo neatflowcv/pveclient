@@ -1,8 +1,6 @@
 package config
 
 import (
-	"errors"
-	"fmt"
 	"log"
 	"os"
 
@@ -10,13 +8,17 @@ import (
 )
 
 type Config struct {
-	ProxmoxURL string
-	APIToken   string
+	ProxmoxURL  string
+	Insecure    bool
+	Username    string
+	Realm       string
+	AuthMethod  string
+	TokenID     string // if authMethod is token
+	TokenSecret string // if authMethod is token
+	Password    string // if authMethod is password
 }
 
-var ErrEnvNotSet = errors.New("environment variable is not set")
-
-func LoadConfig() (*Config, error) {
+func LoadConfig() *Config {
 	err := godotenv.Load()
 	if err != nil {
 		log.Printf("Warning: Could not load .env file: %v", err)
@@ -25,18 +27,32 @@ func LoadConfig() (*Config, error) {
 		log.Println("Loaded environment variables from .env file")
 	}
 
-	proxmoxURL := os.Getenv("PROXMOX_URL")
-	if proxmoxURL == "" {
-		return nil, fmt.Errorf("PROXMOX_URL: %w", ErrEnvNotSet)
-	}
-
-	apiToken := os.Getenv("PROXMOX_API_TOKEN")
-	if apiToken == "" {
-		return nil, fmt.Errorf("PROXMOX_API_TOKEN: %w", ErrEnvNotSet)
-	}
+	proxmoxURL := getEnv("PROXMOX_URL", "https://localhost:8006")
+	insecure := getEnv("PROXMOX_INSECURE", "false") == "true"
+	username := getEnv("PROXMOX_USERNAME", "")
+	realm := getEnv("PROXMOX_REALM", "")
+	authMethod := getEnv("PROXMOX_AUTH_METHOD", "token")
+	tokenID := getEnv("PROXMOX_TOKEN_ID", "")
+	tokenSecret := getEnv("PROXMOX_TOKEN_SECRET", "")
+	password := getEnv("PROXMOX_PASSWORD", "")
 
 	return &Config{
-		ProxmoxURL: proxmoxURL,
-		APIToken:   apiToken,
-	}, nil
+		ProxmoxURL:  proxmoxURL,
+		Realm:       realm,
+		AuthMethod:  authMethod,
+		TokenID:     tokenID,
+		TokenSecret: tokenSecret,
+		Username:    username,
+		Password:    password,
+		Insecure:    insecure,
+	}
+}
+
+func getEnv(key string, defaultValue string) string {
+	ret := os.Getenv(key)
+	if ret == "" {
+		return defaultValue
+	}
+
+	return ret
 }
