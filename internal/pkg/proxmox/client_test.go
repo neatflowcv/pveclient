@@ -3,9 +3,10 @@
 package proxmox_test
 
 import (
-	"os"
+	"fmt"
 	"testing"
 
+	"github.com/neatflowcv/pveclient/internal/pkg/config"
 	"github.com/neatflowcv/pveclient/internal/pkg/proxmox"
 	"github.com/stretchr/testify/require"
 )
@@ -53,17 +54,24 @@ func TestClient_ListDisks(t *testing.T) {
 func newClient(t *testing.T) *proxmox.Client {
 	t.Helper()
 
-	baseURL := os.Getenv("PROXMOX_URL")
-	if baseURL == "" {
-		t.Skip("PROXMOX_URL environment variable not set, skipping integration test")
+	config := config.LoadConfig()
+
+	var opts []proxmox.ConfigOption
+
+	if config.Insecure {
+		opts = append(opts, proxmox.WithInsecure())
 	}
 
-	apiToken := os.Getenv("PROXMOX_API_TOKEN")
-	if apiToken == "" {
-		t.Skip("PROXMOX_API_TOKEN environment variable not set, skipping integration test")
+	switch config.AuthMethod {
+	case "token":
+		secret := fmt.Sprintf("PVEAPIToken=%s@%s!%s=%s", config.Username, config.Realm, config.TokenID, config.TokenSecret)
+
+		return proxmox.NewClient(config.ProxmoxURL, secret, opts...)
+
+	case "password":
+		panic("unimplemented")
+
+	default:
+		panic("invalid auth method: " + config.AuthMethod)
 	}
-
-	client := proxmox.NewClient(baseURL, apiToken, proxmox.WithInsecure())
-
-	return client
 }
