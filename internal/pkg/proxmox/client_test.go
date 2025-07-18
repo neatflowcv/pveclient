@@ -51,6 +51,17 @@ func TestClient_ListDisks(t *testing.T) {
 	require.NotEmpty(t, disks)
 }
 
+func TestClient_IssueTicket(t *testing.T) {
+	t.Parallel()
+	client := newClient(t)
+	config := config.LoadConfig()
+	ctx := t.Context()
+
+	_, err := client.IssueTicket(ctx, config.Realm, config.Username, config.Password)
+
+	require.NoError(t, err)
+}
+
 func newClient(t *testing.T) *proxmox.Client {
 	t.Helper()
 
