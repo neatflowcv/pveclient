@@ -3,7 +3,6 @@
 package proxmox_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/neatflowcv/pveclient/internal/pkg/config"
@@ -51,6 +50,17 @@ func TestClient_ListDisks(t *testing.T) {
 	require.NotEmpty(t, disks)
 }
 
+func TestClient_IssueTicket(t *testing.T) {
+	t.Parallel()
+	client := newClient(t)
+	config := config.LoadConfig()
+	ctx := t.Context()
+
+	_, err := client.IssueTicket(ctx, config.Realm, config.Username, config.Password)
+
+	require.NoError(t, err)
+}
+
 func newClient(t *testing.T) *proxmox.Client {
 	t.Helper()
 
@@ -64,14 +74,26 @@ func newClient(t *testing.T) *proxmox.Client {
 
 	switch config.AuthMethod {
 	case "token":
-		secret := fmt.Sprintf("PVEAPIToken=%s@%s!%s=%s", config.Username, config.Realm, config.TokenID, config.TokenSecret)
+		auth, err := proxmox.NewTokenAuth(config.Realm, config.Username, config.TokenID, config.TokenSecret)
+		require.NoError(t, err)
 
-		return proxmox.NewClient(config.ProxmoxURL, secret, opts...)
+		client, err := proxmox.NewClient(t.Context(), config.ProxmoxURL, auth, opts...)
+		require.NoError(t, err)
+
+		return client
 
 	case "password":
-		panic("unimplemented")
+		auth, err := proxmox.NewLoginAuth(config.Realm, config.Username, config.Password)
+		require.NoError(t, err)
+
+		client, err := proxmox.NewClient(t.Context(), config.ProxmoxURL, auth, opts...)
+		require.NoError(t, err)
+
+		return client
 
 	default:
-		panic("invalid auth method: " + config.AuthMethod)
+		require.Fail(t, "invalid auth method: "+config.AuthMethod)
+
+		return nil
 	}
 }

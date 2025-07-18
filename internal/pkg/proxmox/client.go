@@ -11,7 +11,7 @@ import (
 
 type Client struct {
 	baseURL   string
-	apiToken  string
+	auth      Auth
 	requester *Requester
 }
 
@@ -23,17 +23,23 @@ type VersionResponse struct {
 	} `json:"data"`
 }
 
-func NewClient(baseURL string, apiToken string, opts ...ConfigOption) *Client {
+func NewClient(ctx context.Context, baseURL string, auth Auth, opts ...ConfigOption) (*Client, error) {
 	var config Config
 	for _, opt := range opts {
 		opt(&config)
 	}
 
-	return &Client{
+	client := Client{
 		baseURL:   baseURL,
-		apiToken:  apiToken,
+		auth:      auth,
 		requester: NewRequester(config.insecureSkipTLS),
 	}
+
+	if err := auth.Authenticate(ctx, &client); err != nil {
+		return nil, err
+	}
+
+	return &client, nil
 }
 
 var ErrInvalidStatusCode = errors.New("invalid status code")
@@ -44,9 +50,7 @@ func (c *Client) Version(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("failed to construct URL: %w", err)
 	}
 
-	req := NewGetRequest(ctx, endpoint, map[string][]string{
-		"Authorization": {c.apiToken},
-	})
+	req := NewGetRequest(ctx, endpoint, c.auth.ModifyHeaders(nil))
 
 	statusCode, content, err := c.requester.Call(req)
 	if err != nil {
@@ -91,9 +95,7 @@ func (c *Client) ListNodes(ctx context.Context) (*ListNodesResponse, error) {
 		return nil, fmt.Errorf("failed to construct URL: %w", err)
 	}
 
-	req := NewGetRequest(ctx, endpoint, map[string][]string{
-		"Authorization": {c.apiToken},
-	})
+	req := NewGetRequest(ctx, endpoint, c.auth.ModifyHeaders(nil))
 
 	statusCode, content, err := c.requester.Call(req)
 	if err != nil {
@@ -150,9 +152,7 @@ func (c *Client) ListDisks(ctx context.Context, node string) (*ListDisksResponse
 		return nil, fmt.Errorf("failed to construct URL: %w", err)
 	}
 
-	req := NewGetRequest(ctx, endpoint, map[string][]string{
-		"Authorization": {c.apiToken},
-	})
+	req := NewGetRequest(ctx, endpoint, c.auth.ModifyHeaders(nil))
 
 	statusCode, content, err := c.requester.Call(req)
 	if err != nil {
@@ -171,6 +171,108 @@ func (c *Client) ListDisks(ctx context.Context, node string) (*ListDisksResponse
 	}
 
 	return &ret, nil
+}
+
+func (c *Client) IssueTicket(ctx context.Context, realm, username, password string) (*IssueTicketResponse, error) {
+	endpoint, err := url.JoinPath(c.baseURL, "/api2/json/access/ticket")
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct URL: %w", err)
+	}
+
+	req := NewPostRequest(ctx, endpoint, map[string][]string{
+		"Content-Type": {"application/x-www-form-urlencoded"},
+	}, []byte(fmt.Sprintf("username=%s@%s&password=%s", username, realm, password)))
+
+	statusCode, content, err := c.requester.Call(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode != StatusCodeOK {
+		return nil, fmt.Errorf("%w: %d", ErrInvalidStatusCode, statusCode)
+	}
+
+	var ret IssueTicketResponse
+
+	err = json.Unmarshal(content, &ret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse JSON response: %w", err)
+	}
+
+	return &ret, nil
+}
+
+type IssueTicketResponse struct {
+	Data struct {
+		Ticket   string `json:"ticket"`
+		Username string `json:"username"`
+		Cap      struct {
+			Mapping struct {
+				MappingAudit      int `json:"Mapping.Audit"`
+				MappingUse        int `json:"Mapping.Use"`
+				MappingModify     int `json:"Mapping.Modify"`
+				PermissionsModify int `json:"Permissions.Modify"`
+			} `json:"mapping"`
+			Nodes struct {
+				SysPowerMgmt      int `json:"Sys.PowerMgmt"`
+				SysModify         int `json:"Sys.Modify"`
+				SysAudit          int `json:"Sys.Audit"`
+				PermissionsModify int `json:"Permissions.Modify"`
+				SysSyslog         int `json:"Sys.Syslog"`
+				SysAccessNetwork  int `json:"Sys.AccessNetwork"`
+				SysConsole        int `json:"Sys.Console"`
+				SysIncoming       int `json:"Sys.Incoming"`
+			} `json:"nodes"`
+			Storage struct {
+				PermissionsModify         int `json:"Permissions.Modify"`
+				DatastoreAllocate         int `json:"Datastore.Allocate"`
+				DatastoreAllocateTemplate int `json:"Datastore.AllocateTemplate"`
+				DatastoreAudit            int `json:"Datastore.Audit"`
+				DatastoreAllocateSpace    int `json:"Datastore.AllocateSpace"`
+			} `json:"storage"`
+			Sdn struct {
+				PermissionsModify int `json:"Permissions.Modify"`
+				SDNUse            int `json:"SDN.Use"`
+				SDNAudit          int `json:"SDN.Audit"`
+				SDNAllocate       int `json:"SDN.Allocate"`
+			} `json:"sdn"`
+			Dc struct {
+				SysAudit    int `json:"Sys.Audit"`
+				SDNAudit    int `json:"SDN.Audit"`
+				SDNUse      int `json:"SDN.Use"`
+				SysModify   int `json:"Sys.Modify"`
+				SDNAllocate int `json:"SDN.Allocate"`
+			} `json:"dc"`
+			Access struct {
+				UserModify        int `json:"User.Modify"`
+				PermissionsModify int `json:"Permissions.Modify"`
+				GroupAllocate     int `json:"Group.Allocate"`
+			} `json:"access"`
+			Vms struct {
+				VMSnapshot         int `json:"VM.Snapshot"`
+				PermissionsModify  int `json:"Permissions.Modify"`
+				VMAllocate         int `json:"VM.Allocate"`
+				VMConsole          int `json:"VM.Console"`
+				VMConfigCPU        int `json:"VM.Config.CPU"`
+				VMPowerMgmt        int `json:"VM.PowerMgmt"`
+				VMConfigCloudinit  int `json:"VM.Config.Cloudinit"`
+				VMConfigNetwork    int `json:"VM.Config.Network"`
+				VMConfigDisk       int `json:"VM.Config.Disk"`
+				VMConfigMemory     int `json:"VM.Config.Memory"`
+				VMSnapshotRollback int `json:"VM.Snapshot.Rollback"`
+				VMConfigCDROM      int `json:"VM.Config.CDROM"`
+				VMConfigHWType     int `json:"VM.Config.HWType"`
+				VMBackup           int `json:"VM.Backup"`
+				VMMonitor          int `json:"VM.Monitor"`
+				VMConfigOptions    int `json:"VM.Config.Options"`
+				VMAudit            int `json:"VM.Audit"`
+				VMClone            int `json:"VM.Clone"`
+				VMMigrate          int `json:"VM.Migrate"`
+			} `json:"vms"`
+		} `json:"cap"`
+		CSRFPreventionToken string `json:"CSRFPreventionToken"`
+		Clustername         string `json:"clustername"`
+	} `json:"data"`
 }
 
 type Wearout struct {
