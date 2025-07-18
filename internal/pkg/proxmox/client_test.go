@@ -3,9 +3,9 @@
 package proxmox_test
 
 import (
-	"os"
 	"testing"
 
+	"github.com/neatflowcv/pveclient/internal/pkg/config"
 	"github.com/neatflowcv/pveclient/internal/pkg/proxmox"
 	"github.com/stretchr/testify/require"
 )
@@ -53,17 +53,10 @@ func TestClient_ListDisks(t *testing.T) {
 func newClient(t *testing.T) *proxmox.Client {
 	t.Helper()
 
-	baseURL := os.Getenv("PROXMOX_URL")
-	if baseURL == "" {
-		t.Skip("PROXMOX_URL environment variable not set, skipping integration test")
-	}
+	config, err := config.LoadConfig()
+	require.NoError(t, err)
 
-	apiToken := os.Getenv("PROXMOX_API_TOKEN")
-	if apiToken == "" {
-		t.Skip("PROXMOX_API_TOKEN environment variable not set, skipping integration test")
-	}
-
-	client := proxmox.NewClient(baseURL, apiToken, proxmox.WithInsecure())
+	client := proxmox.NewClient(config.ProxmoxURL, config.APIToken, proxmox.WithInsecure())
 
 	return client
 }
