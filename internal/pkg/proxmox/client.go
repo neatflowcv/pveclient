@@ -11,7 +11,7 @@ import (
 
 type Client struct {
 	baseURL   string
-	apiToken  string
+	auth      Auth
 	requester *Requester
 }
 
@@ -23,17 +23,23 @@ type VersionResponse struct {
 	} `json:"data"`
 }
 
-func NewClient(baseURL string, apiToken string, opts ...ConfigOption) *Client {
+func NewClient(ctx context.Context, baseURL string, auth Auth, opts ...ConfigOption) (*Client, error) {
 	var config Config
 	for _, opt := range opts {
 		opt(&config)
 	}
 
-	return &Client{
+	client := Client{
 		baseURL:   baseURL,
-		apiToken:  apiToken,
+		auth:      auth,
 		requester: NewRequester(config.insecureSkipTLS),
 	}
+
+	if err := auth.Authenticate(ctx, &client); err != nil {
+		return nil, err
+	}
+
+	return &client, nil
 }
 
 var ErrInvalidStatusCode = errors.New("invalid status code")
@@ -44,9 +50,7 @@ func (c *Client) Version(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("failed to construct URL: %w", err)
 	}
 
-	req := NewGetRequest(ctx, endpoint, map[string][]string{
-		"Authorization": {c.apiToken},
-	})
+	req := NewGetRequest(ctx, endpoint, c.auth.ModifyHeaders(nil))
 
 	statusCode, content, err := c.requester.Call(req)
 	if err != nil {
@@ -91,9 +95,7 @@ func (c *Client) ListNodes(ctx context.Context) (*ListNodesResponse, error) {
 		return nil, fmt.Errorf("failed to construct URL: %w", err)
 	}
 
-	req := NewGetRequest(ctx, endpoint, map[string][]string{
-		"Authorization": {c.apiToken},
-	})
+	req := NewGetRequest(ctx, endpoint, c.auth.ModifyHeaders(nil))
 
 	statusCode, content, err := c.requester.Call(req)
 	if err != nil {
@@ -150,9 +152,7 @@ func (c *Client) ListDisks(ctx context.Context, node string) (*ListDisksResponse
 		return nil, fmt.Errorf("failed to construct URL: %w", err)
 	}
 
-	req := NewGetRequest(ctx, endpoint, map[string][]string{
-		"Authorization": {c.apiToken},
-	})
+	req := NewGetRequest(ctx, endpoint, c.auth.ModifyHeaders(nil))
 
 	statusCode, content, err := c.requester.Call(req)
 	if err != nil {

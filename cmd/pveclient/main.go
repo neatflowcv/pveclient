@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/neatflowcv/pveclient/internal/pkg/config"
@@ -24,12 +23,34 @@ func newClient(config *config.Config) *proxmox.Client {
 
 	switch config.AuthMethod {
 	case "token":
-		secret := fmt.Sprintf("PVEAPIToken=%s@%s!%s=%s", config.Username, config.Realm, config.TokenID, config.TokenSecret)
+		log.Println("Using token authentication")
 
-		return proxmox.NewClient(config.ProxmoxURL, secret, opts...)
+		auth, err := proxmox.NewTokenAuth(config.Realm, config.Username, config.TokenID, config.TokenSecret)
+		if err != nil {
+			panic(err)
+		}
+
+		client, err := proxmox.NewClient(context.Background(), config.ProxmoxURL, auth, opts...)
+		if err != nil {
+			panic(err)
+		}
+
+		return client
 
 	case "password":
-		panic("unimplemented")
+		log.Println("Using password authentication")
+
+		auth, err := proxmox.NewLoginAuth(config.Realm, config.Username, config.Password)
+		if err != nil {
+			panic(err)
+		}
+
+		client, err := proxmox.NewClient(context.Background(), config.ProxmoxURL, auth, opts...)
+		if err != nil {
+			panic(err)
+		}
+
+		return client
 
 	default:
 		panic("invalid auth method: " + config.AuthMethod)
